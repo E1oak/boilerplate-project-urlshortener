@@ -12,22 +12,23 @@ let urls = [];
 
 app.post('/api/shorturl', (req, res) => {
   const url = req.body.url;
-  // Validación ultra simple para el punto 4
-  if (!url.startsWith('http')) {
+  // El punto 4 pide validar que empiece con http o https
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
     return res.json({ error: 'invalid url' });
   }
   urls.push(url);
-  res.json({ original_url: url, short_url: urls.length });
+  return res.json({ original_url: url, short_url: urls.length });
 });
 
 app.get('/api/shorturl/:short_url', (req, res) => {
   const id = parseInt(req.params.short_url);
   const originalUrl = urls[id - 1];
+  
   if (originalUrl) {
-    // Redirección forzada al instante
-    return res.redirect(301, originalUrl);
+    // Redirección 302 estándar (la que mejor reconoce el test)
+    return res.redirect(302, originalUrl);
   }
-  res.json({ error: "No short URL found" });
+  return res.json({ error: "No short URL found" });
 });
 
 app.listen(process.env.PORT || 3000);
