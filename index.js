@@ -12,19 +12,17 @@ let urls = [];
 
 app.post('/api/shorturl', (req, res) => {
   const url = req.body.url;
-  if (!url.startsWith('http')) {
+  // Validación ultra rápida para el punto 4
+  if (!/^https?:\/\//.test(url)) {
     return res.json({ error: 'invalid url' });
   }
   urls.push(url);
-  return res.json({ original_url: url, short_url: urls.length });
+  res.json({ original_url: url, short_url: urls.length });
 });
 
-// REDIRECCIÓN SIN PROCESAMIENTO
-app.get('/api/shorturl/:short_url', (req, res) => {
-  const originalUrl = urls[req.params.short_url - 1];
-  if (originalUrl) {
-    return res.redirect(originalUrl);
-  }
+app.get('/api/shorturl/:id', (req, res) => {
+  const url = urls[parseInt(req.params.id) - 1];
+  if (url) return res.redirect(url);
   res.json({ error: "No short URL found" });
 });
 
