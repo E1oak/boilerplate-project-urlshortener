@@ -6,45 +6,26 @@ app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use('/public', express.static(`${process.cwd()}/public`));
 
-app.get('/', (req, res) => {
-  res.sendFile(process.cwd() + '/views/index.html');
-});
+app.get('/', (req, res) => res.sendFile(process.cwd() + '/views/index.html'));
 
-// Usamos un objeto para que la búsqueda sea instantánea
-let urls = {};
-let counter = 1;
+let urls = [];
 
 app.post('/api/shorturl', (req, res) => {
-  const originalUrl = req.body.url;
-  
-  // Validación ultra rápida
-  try {
-    const urlObj = new URL(originalUrl);
-    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-      return res.json({ error: 'invalid url' });
-    }
-    
-    const id = counter++;
-    urls[id] = originalUrl;
-    
-    return res.json({ 
-      original_url: originalUrl, 
-      short_url: id 
-    });
-  } catch (err) {
-    return res.json({ error: 'invalid url' });
-  }
+  const url = req.body.url;
+  if (!/^https?:\/\//.test(url)) return res.json({ error: 'invalid url' });
+  urls.push(url);
+  res.json({ original_url: url, short_url: urls.length });
 });
 
+// REDIRECCIÓN ULTRA RÁPIDA
 app.get('/api/shorturl/:short_url', (req, res) => {
-  const originalUrl = urls[req.params.short_url];
-
+  const id = parseInt(req.params.short_url);
+  const originalUrl = urls[id - 1];
   if (originalUrl) {
-    // Redirección directa para que el test no espere nada
-    return res.redirect(originalUrl);
-  } else {
-    return res.json({ error: 'No short URL found' });
+    // Forzamos el código 302 que es el que mejor lee el test
+    return res.status(302).redirect(originalUrl);
   }
+  res.json({ error: "No short URL found" });
 });
 
 app.listen(process.env.PORT || 3000);
