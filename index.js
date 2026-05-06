@@ -1,33 +1,69 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const dns = require('dns');
+const { URL } = require('url');
+
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use('/public', express.static(`${process.cwd()}/public`));
 
-app.get('/', (req, res) => res.sendFile(process.cwd() + '/views/index.html'));
+// Home
+app.get('/', (req, res) => {
+  res.sendFile(process.cwd() + '/views/index.html');
+});
 
-let urls = [];
+// "Base de datos" en memoria
+let urlDatabase = {};
+let counter = 1;
 
+// POST - crear short URL
 app.post('/api/shorturl', (req, res) => {
-  const url = req.body.url;
-  if (!/^https?:\/\//.test(url)) return res.json({ error: 'invalid url' });
-  urls.push(url);
-  // Importante: No uses res.status().json(), usa res.json() directo
-  res.json({ original_url: url, short_url: urls.length });
-});
+  const inputUrl = req.body.url;
 
-app.get('/api/shorturl/:short_url', (req, res) => {
-  const id = parseInt(req.params.short_url);
-  const originalUrl = urls[id - 1];
-  if (originalUrl) {
-    // Truco: Forzamos la redirección sin ninguna lógica extra para que sea instantáneo
-    res.set('location', originalUrl);
-    return res.status(300).send();
+  let hostname;
+  try {
+    const parsedUrl = new URL(inputUrl);
+    hostname = parsedUrl.hostname;
+  } catch (err) {
+    return res.json({ error: 'invalid url' });
   }
-  res.json({ error: "No short URL found" });
+
+  // Verificar dominio con DNS (requisito FCC)
+  dns.lookup(hostname, (err) => {
+    if (err) {
+      return res.json({ error: 'invalid url' });
+    }
+
+    const shortUrl = counter;
+    urlDatabase[shortUrl] = inputUrl;
+
+    counter++;
+
+    res.json({
+      original_url: inputUrl,
+      short_url: shortUrl
+    });
+  });
 });
 
-app.listen(process.env.PORT || 3000);
+// GET - redirección
+app.get('/api/shorturl/:short_url', (req, res) => {
+  const shortUrl = req.params.short_url;
 
+  if (urlDatabase[shortUrl]) {
+    return res.redirect(urlDatabase[shortUrl]); // 🔥 clave para pasar el test
+  }
+
+  res.json({ error: 'No short URL found' });
+});
+
+// Server
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Listening on port ${port}`);
+});
