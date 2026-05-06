@@ -44,6 +44,8 @@ app.post('/api/shorturl', (req, res) => {
 
     counter++;
 
+    console.log('DB actual:', urlDatabase); // 🔍 debug útil
+
     res.json({
       original_url: inputUrl,
       short_url: shortUrl
@@ -51,12 +53,12 @@ app.post('/api/shorturl', (req, res) => {
   });
 });
 
-// GET - redirección
+// GET - redirección (FIX aplicado)
 app.get('/api/shorturl/:short_url', (req, res) => {
-  const shortUrl = req.params.short_url;
+  const shortUrl = parseInt(req.params.short_url); // 🔥 IMPORTANTE
 
   if (urlDatabase[shortUrl]) {
-    return res.redirect(urlDatabase[shortUrl]); // 🔥 clave para pasar el test
+    return res.redirect(urlDatabase[shortUrl]); // ✅ redirige correctamente
   }
 
   res.json({ error: 'No short URL found' });
