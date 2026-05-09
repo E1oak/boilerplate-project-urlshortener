@@ -1,72 +1,49 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dns = require('dns'); // Necesario para la validación sugerida
-const urlParser = require('url'); // Para limpiar la URL antes de validarla
+const bodyParser = require('body-parser');
+const dns = require('dns');
+const urlParser = require('url');
 const app = express();
 
-// Configuración básica
-const port = process.env.PORT || 3000;
-
 app.use(cors());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use('/public', express.static(`${process.cwd()}/public`));
+// Simulación de base de datos en memoria
+let urls = [];
+let id = 1;
 
-app.get('/', function(req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
-});
-
-// Almacenamiento en memoria (Nota: se borra si se reinicia el server)
-const urlMap = {};
-let idCounter = 1;
-
-// --- RUTA POST PARA ACORTAR URL ---
+// 1. POST: Recibir la URL original y devolver la corta
 app.post('/api/shorturl', (req, res) => {
   const originalUrl = req.body.url;
+  
+  // Extraer el hostname para validar con DNS
+  const hostname = urlParser.parse(originalUrl).hostname;
 
-  // 1. Validar el formato con URL constructor (más robusto que regex simple)
-  try {
-    const parsedUrl = new URL(originalUrl);
-    
-    // 2. Validar que el protocolo sea http o https
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      return res.json({ error: 'invalid url' });
-    }
-
-    // 3. Verificar que el dominio exista usando el módulo DNS
-    dns.lookup(parsedUrl.hostname, (err) => {
-      if (err) {
-        res.json({ error: 'invalid url' });
-      } else {
-        // Si todo está bien, guardamos
-        const shortUrl = idCounter++;
-        urlMap[shortUrl] = originalUrl;
-        res.json({ 
-          original_url: originalUrl, 
-          short_url: shortUrl 
-        });
-      }
-    });
-  } catch (err) {
-    // Si el constructor de URL falla
+  if (!hostname) {
     return res.json({ error: 'invalid url' });
   }
+
+  dns.lookup(hostname, (err) => {
+    if (err) {
+      res.json({ error: 'invalid url' });
+    } else {
+      const shortUrl = id++;
+      urls.push({ original_url: originalUrl, short_url: shortUrl });
+      res.json({ original_url: originalUrl, short_url: shortUrl });
+    }
+  });
 });
 
-// --- RUTA GET PARA REDIRECCIÓN ---
-app.get('/api/shorturl/:id', (req, res) => {
-  const id = req.params.id;
-  const original = urlMap[id];
-  
-  if (original) {
-    return res.redirect(original);
+// 2. GET: Redirigir de la URL corta a la original
+app.get('/api/shorturl/:short_url', (req, res) => {
+  const shortUrl = parseInt(req.params.short_url);
+  const foundUrl = urls.find(u => u.short_url === shortUrl);
+
+  if (foundUrl) {
+    res.redirect(foundUrl.original_url);
   } else {
-    res.json({ error: 'No short URL found' });
+    res.json({ error: 'No short URL found for the given input' });
   }
 });
 
-app.listen(port, function() {
-  console.log(`Listening on port ${port}`);
-});
+app.listen(3000, () => console.log('Servidor corriendo en el puerto 3000'));
